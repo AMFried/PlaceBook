@@ -1,7 +1,13 @@
 package com.raywenderlich.placebook
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.location.Location
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
+import androidx.core.app.ActivityCompat
+import com.google.android.gms.location.*
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -10,9 +16,39 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 
+
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
-    private lateinit var mMap: GoogleMap
+    private lateinit var map: GoogleMap
+    private lateinit var fusedLocationClient : FusedLocationProviderClient
+
+
+    private fun requestLocationPermissions(){
+        //Requests execution permission from user
+        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_LOCATION)
+    }
+
+
+
+    private fun getCurrentLocation(){
+        if(ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED){
+            requestLocationPermissions()
+        }
+        else{
+            map.isMyLocationEnabled = true //Displays blue dot and handles all logic for getCurrentLocation Very useful
+            fusedLocationClient.lastLocation.addOnCompleteListener{
+                val location = it.result
+                if(location != null){
+                    val latLng = LatLng(location.latitude, location.longitude)
+                    val update = CameraUpdateFactory.newLatLngZoom(latLng,16.0f)
+                    map.moveCamera(update)
+                }
+                else{
+                    Log.e(TAG, "No location found")
+                }
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -21,6 +57,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val mapFragment = supportFragmentManager
                 .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
+        setupLocationClient()
     }
 
     /**
@@ -33,11 +70,27 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
      * installed Google Play services and returned to the app.
      */
     override fun onMapReady(googleMap: GoogleMap) {
-        mMap = googleMap
+        map = googleMap
+        getCurrentLocation()
+    }
 
-        // Add a marker in Sydney and move the camera
-        val sydney = LatLng(-34.0, 151.0)
-        mMap.addMarker(MarkerOptions().position(sydney).title("Marker in Sydney"))
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney))
+    private fun setupLocationClient(){
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray){
+        if (requestCode == REQUEST_LOCATION){
+            if(grantResults.size == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
+                getCurrentLocation()
+            }
+            else{
+                Log.e(TAG, "Location permission denied")
+            }
+        }
+    }
+
+    companion object {
+        private const val REQUEST_LOCATION = 1
+        private const val TAG = "MapsActivity"
     }
 }
